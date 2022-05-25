@@ -12,7 +12,7 @@ pub struct Writer {
 lazy_static! {
     pub static ref WRITER: Mutex<Writer> = Mutex::new(Writer {
         column_position: 0,
-        color_code: vga::ColorCode::new(vga::Color::Yellow, vga::Color::Black),
+        color_code: vga::ColorCode::new(vga::Color::Green, vga::Color::Black),
         buffer: unsafe { &mut *(0xb8000 as *mut vga::Buffer) },
     });
 }
