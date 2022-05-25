@@ -11,7 +11,7 @@ use core::panic::PanicInfo;
 use x86_64::instructions::port::Port;
 use kernel::lib::print;
 use crate::idt::{Attributes, Entry, Idt};
-use crate::kernel::interrupts::idt;
+use kernel::arch::x86::interrupts::idt;
 
 #[no_mangle]
 pub extern "C" fn _start() -> ! {

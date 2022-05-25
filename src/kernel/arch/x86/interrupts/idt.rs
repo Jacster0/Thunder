@@ -7,7 +7,7 @@ use x86_64::instructions::segmentation::CS;
 use x86_64::registers::segmentation::Segment;
 use x86_64::structures::idt::HandlerFunc;
 use x86_64::VirtAddr;
-use crate::kernel::interrupts::idt;
+use crate::kernel::arch::x86::interrupts::idt;
 use crate::println;
 
 pub type HandlerFunction = extern "C" fn() -> !;
