@@ -136,7 +136,7 @@ impl Idt {
     }
 
     pub fn set_presentation(&mut self, entry: u8, value: bool) {
-        self.0[entry as usize].attributes |= value as u8;
+        self.0[entry as usize].attributes = (self.0[entry as usize].attributes & 0x7F) | (value as u8) << 0x7;
     }
 }
 
