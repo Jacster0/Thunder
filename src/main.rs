@@ -10,7 +10,7 @@ use core::arch::asm;
 use core::panic::PanicInfo;
 use x86_64::instructions::port::Port;
 use kernel::lib::print;
-use crate::idt::{Attributes, Entry, Idt};
+use crate::idt::{Attributes, Entry, InterruptDescriptorTable};
 use kernel::arch::x86::interrupts::idt;
 
 #[no_mangle]

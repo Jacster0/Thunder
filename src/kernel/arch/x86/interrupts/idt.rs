@@ -5,13 +5,11 @@ use x86_64::structures::gdt::SegmentSelector;
 use modular_bitfield::prelude::*;
 use x86_64::instructions::segmentation::CS;
 use x86_64::registers::segmentation::Segment;
-use x86_64::structures::idt::HandlerFunc;
-use x86_64::VirtAddr;
 use crate::kernel::arch::x86::interrupts::idt;
 use crate::println;
 
 pub type HandlerFunction = extern "C" fn() -> !;
-pub struct Idt([Entry; 16]);
+pub struct InterruptDescriptorTable([Entry; 16]);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -25,6 +23,20 @@ pub enum PrivilegeLevel {
 pub enum GateType {
     Interrupt = 0xE,
     Trap = 0xF
+}
+
+#[derive(Debug, Clone, Copy)]
+#[repr(C, packed(2))]
+pub struct InterruptDescriptorTableRegister {
+    pub limit: u16,
+    pub baseAddr: u64,
+}
+
+#[inline]
+pub unsafe fn load_idt(idt_register: &InterruptDescriptorTableRegister) {
+    unsafe {
+        asm!("lidt [{}]", in(reg) idt_register, options(readonly, nostack, preserves_flags));
+    }
 }
 
 pub struct Attributes {
@@ -89,24 +101,22 @@ impl Entry {
     }
  }
 
-
-impl Idt {
+impl InterruptDescriptorTable {
     pub fn load(&'static self) {
-        use x86_64::instructions::tables::{DescriptorTablePointer, lidt};
         use core::mem::size_of;
 
-        let ptr = DescriptorTablePointer {
-            base: VirtAddr::new(self as *const _ as u64),
+        let idt_register = InterruptDescriptorTableRegister {
             limit: (size_of::<Self>() -1) as u16,
+            baseAddr: self as *const _ as u64
         };
 
         unsafe {
-            lidt(&ptr)
+            load_idt(&idt_register)
         };
     }
 
-    pub fn new() -> Idt {
-        Idt([Entry::new(); 16])
+    pub fn new() -> InterruptDescriptorTable {
+        InterruptDescriptorTable([Entry::new(); 16])
     }
 
     pub fn init(&mut self, index: usize, handler: HandlerFunction) {
@@ -127,12 +137,7 @@ impl Idt {
     }
 
     pub fn set_handler(&mut self, entry: usize, handler: HandlerFunction) {
-        let ptr = handler as u64;
-
-        self.0[entry].selector = CS::get_reg();
-        self.0[entry].address_low = ptr as u16;
-        self.0[entry].address_middle =  (ptr >> 16) as u16;
-        self.0[entry].address_high = (ptr >> 32) as u32;
+        self.0[entry].set_handler(CS::get_reg(), handler);
     }
 
     pub fn set_presentation(&mut self, entry: u8, value: bool) {
@@ -141,8 +146,8 @@ impl Idt {
 }
 
 lazy_static! {
-    pub static ref IDT: idt::Idt = {
-        let mut idt = Idt::new();
+    pub static ref IDT: idt::InterruptDescriptorTable = {
+        let mut idt = InterruptDescriptorTable::new();
         idt.init(0, divide_by_zero_handler);
         idt
     };
