@@ -33,9 +33,13 @@ pub struct InterruptDescriptorTableRegister {
 }
 
 #[inline]
-pub unsafe fn load_idt(idt_register: &InterruptDescriptorTableRegister) {
+pub fn load_idt(idt_register: &InterruptDescriptorTableRegister) {
     unsafe {
-        asm!("lidt [{}]", in(reg) idt_register, options(readonly, nostack, preserves_flags));
+        asm! {
+            "lidt [{}]",
+            in(reg) idt_register,
+            options(readonly, nostack, preserves_flags)
+        };
     }
 }
 
@@ -110,9 +114,7 @@ impl InterruptDescriptorTable {
             baseAddr: self as *const _ as u64
         };
 
-        unsafe {
-            load_idt(&idt_register)
-        };
+        load_idt(&idt_register)
     }
 
     pub fn new() -> InterruptDescriptorTable {
