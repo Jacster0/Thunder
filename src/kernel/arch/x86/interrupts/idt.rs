@@ -5,9 +5,10 @@ use x86_64::structures::gdt::SegmentSelector;
 use modular_bitfield::prelude::*;
 use x86_64::instructions::segmentation::CS;
 use x86_64::registers::segmentation::Segment;
-use crate::kernel::arch::x86::interrupts::idt;
+use crate::kernel::arch::x86::interrupts::{exception, idt};
 use crate::println;
 use crate::kernel::arch::x86::interrupts::exception::*;
+use crate::exception_handler;
 
 pub type HandlerFunction = extern "C" fn() -> !;
 pub struct InterruptDescriptorTable([Entry; 16]);
@@ -151,7 +152,7 @@ impl InterruptDescriptorTable {
 lazy_static! {
     pub static ref IDT: idt::InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
-        idt.init(0,  divide_by_zero_wrapper);
+        idt.init(0,  exception_handler!(divide_by_zero_handler));
         idt
     };
 }
@@ -159,9 +160,3 @@ lazy_static! {
 pub fn init() {
     IDT.load();
 }
-
-
-// extern "C" fn divide_by_zero_handler() -> ! {
-//     println!("EXCEPTION: DIVIDE BY ZERO");
-//     loop {}
-// }
