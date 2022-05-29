@@ -3,6 +3,9 @@
 #![feature(custom_test_frameworks)]
 #![reexport_test_harness_main = "test_main"]
 #![feature(asm)]
+#![feature(core_intrinsics)]
+#![feature(naked_functions)]
+#![feature(asm_sym)]
 
 mod kernel;
 
