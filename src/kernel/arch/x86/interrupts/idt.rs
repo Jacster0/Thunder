@@ -8,7 +8,8 @@ use x86_64::registers::segmentation::Segment;
 use crate::kernel::arch::x86::interrupts::{exception, idt};
 use crate::println;
 use crate::kernel::arch::x86::interrupts::exception::*;
-use crate::exception_handler;
+use crate::interrupt_error;
+use crate::interrupt_error_with_code;
 
 pub type HandlerFunction = extern "C" fn() -> !;
 pub struct InterruptDescriptorTable([Entry; 16]);
@@ -142,6 +143,8 @@ impl InterruptDescriptorTable {
 
     pub fn set_handler(&mut self, entry: usize, handler: HandlerFunction) {
         self.0[entry].set_handler(CS::get_reg(), handler);
+        self.0[entry].set_attributes(Attributes::new());
+        self.0[entry].set_interrupt_stack_table(0);
     }
 
     pub fn set_presentation(&mut self, entry: u8, value: bool) {
@@ -152,7 +155,8 @@ impl InterruptDescriptorTable {
 lazy_static! {
     pub static ref IDT: idt::InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
-        idt.init(0,  exception_handler!(divide_by_zero_handler));
+        idt.init(0,  interrupt_error!(divide_by_zero_handler));
+        idt.set_handler(14, interrupt_error_with_code!(page_fault_handler));
         idt
     };
 }

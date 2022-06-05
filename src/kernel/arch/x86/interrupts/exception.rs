@@ -3,7 +3,7 @@ use core::ptr::addr_of_mut;
 use crate::println;
 
 #[macro_export]
-macro_rules! exception_handler {
+macro_rules! interrupt_error {
     ($name: ident) => {{
         #[naked]
         extern "C" fn wrapper() -> ! {
@@ -21,6 +21,26 @@ macro_rules! exception_handler {
     }}
 }
 
+#[macro_export]
+macro_rules! interrupt_error_with_code {
+    ($name: ident) => {{
+        #[naked]
+        extern "C" fn wrapper() -> ! {
+            unsafe {
+                asm! {
+                    "pop rsi", //pop error code into rsi
+                    "mov rdi, rsp",
+                    "sub rsp, 8", //align stack pointer
+                    "call {}",  //call the function specified by $name
+                    sym $name,
+                    options(noreturn)
+                }
+            }
+        }
+        wrapper
+    }}
+}
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct ExceptionStackFrame {
@@ -33,5 +53,63 @@ pub struct ExceptionStackFrame {
 
 pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", &*stack_frame );
+    loop {}
+}
+
+
+macro_rules! enum_str {
+    (enum $name:ident {
+        $($variant:ident = $val:expr),*,
+    }) => {
+        pub enum $name {
+            $($variant = $val),*
+        }
+
+        impl $name {
+            fn name(&self) -> &'static str {
+                match self {
+                    $($name::$variant => stringify!($variant)),*
+                }
+            }
+        }
+    };
+}
+
+enum_str! {
+    enum PageFaultErrorCode {
+        ProtectionViolation = 1 << 0,
+        CausedByWrite = 1 << 1,
+        UserMode = 1 << 2,
+        MalformedTable = 1 << 3,
+        InstructionFetch = 1 << 4,
+        Unknown = 1 << 5,
+    }
+}
+
+impl From<u64> for PageFaultErrorCode {
+    fn from(code: u64) -> Self {
+        match code {
+            0x1 =>  PageFaultErrorCode::ProtectionViolation,
+            0x2 =>  PageFaultErrorCode::CausedByWrite,
+            0x3 =>  PageFaultErrorCode::UserMode,
+            0x4 =>  PageFaultErrorCode::MalformedTable,
+            0x5 =>  PageFaultErrorCode::InstructionFetch,
+            _ => PageFaultErrorCode::Unknown
+        }
+    }
+}
+
+pub unsafe extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, error_code: u64) -> ! {
+    let cr2: usize;
+    asm! {
+        "mov {}, cr2",
+        out(reg) cr2
+    };
+
+    let cause: PageFaultErrorCode = error_code.into();
+    println!("\nEXCEPTION: PAGE FAULT while accessing {:#x} with error code {:?}\n{:#?}",
+             cr2,
+             Into::<PageFaultErrorCode>::into(error_code).name(),
+             &*stack_frame);
     loop {}
 }
