@@ -9,7 +9,7 @@ macro_rules! interrupt_error {
         extern "C" fn wrapper() -> ! {
            unsafe {
                 asm! {
-                    "mov rdi, rsp",
+                    "mov rdi, rsp", //rdi is used as the first argument passed to a function (x86-64 calling conv) so we move the contents of rsp to rdi
                     "sub rsp, 8", //align stack pointer
                     "call {}", //call the function specified by $name
                     sym $name,
@@ -28,8 +28,8 @@ macro_rules! interrupt_error_with_code {
         extern "C" fn wrapper() -> ! {
             unsafe {
                 asm! {
-                    "pop rsi", //pop error code into rsi
-                    "mov rdi, rsp",
+                    "pop rsi", //rsi is used as the second argument passed to a function (x86-64 calling conv) so we pop the error code into rsi.
+                    "mov rdi, rsp", //rdi is used as the first argument passed to a function (x86-64 calling conv) so we move the contents of rsp to rdi
                     "sub rsp, 8", //align stack pointer
                     "call {}",  //call the function specified by $name
                     sym $name,
