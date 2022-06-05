@@ -1,6 +1,6 @@
 use core::arch::asm;
 use core::ptr::addr_of_mut;
-use crate::println;
+use crate::{enum_str, println};
 
 #[macro_export]
 macro_rules! interrupt_error {
@@ -54,25 +54,6 @@ pub struct ExceptionStackFrame {
 pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", &*stack_frame );
     loop {}
-}
-
-
-macro_rules! enum_str {
-    (enum $name:ident {
-        $($variant:ident = $val:expr),*,
-    }) => {
-        pub enum $name {
-            $($variant = $val),*
-        }
-
-        impl $name {
-            fn name(&self) -> &'static str {
-                match self {
-                    $($name::$variant => stringify!($variant)),*
-                }
-            }
-        }
-    };
 }
 
 enum_str! {
