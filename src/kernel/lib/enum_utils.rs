@@ -8,7 +8,7 @@ macro_rules! enum_str {
         }
 
         impl $name {
-            fn name(&self) -> &'static str {
+            pub fn name(&self) -> &'static str {
                 match self {
                     $($name::$variant => stringify!($variant)),*
                 }

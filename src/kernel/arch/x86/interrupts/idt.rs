@@ -10,6 +10,8 @@ use crate::println;
 use crate::kernel::arch::x86::interrupts::exception::*;
 use crate::interrupt_error;
 use crate::interrupt_error_with_code;
+use crate::save_scratch_registers;
+use crate::restore_scratch_registers;
 
 pub type HandlerFunction = extern "C" fn() -> !;
 pub struct InterruptDescriptorTable([Entry; 16]);
@@ -156,6 +158,7 @@ lazy_static! {
     pub static ref IDT: idt::InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
         idt.init(0,  interrupt_error!(divide_by_zero_handler));
+        idt.set_handler(3, interrupt_error!(breakpoint_handler));
         idt.set_handler(14, interrupt_error_with_code!(page_fault_handler));
         idt
     };

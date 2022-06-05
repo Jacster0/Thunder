@@ -6,6 +6,7 @@
 #![feature(core_intrinsics)]
 #![feature(naked_functions)]
 #![feature(asm_sym)]
+#![feature(asm_const)]
 
 mod kernel;
 
@@ -16,12 +17,16 @@ use kernel::lib::print;
 use crate::idt::{Attributes, Entry, InterruptDescriptorTable};
 use kernel::arch::x86::interrupts::idt;
 
+#[macro_use] // needed for the `int!` macro
+extern crate x86_64;
+
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
     println!("Hello World!");
     idt::init();
+    //unsafe { software_interrupt!(3) };
     unsafe { *(0xdeadbeaf as *mut u64) = 42 };
-    //divide_by_zero();
+    // divide_by_zero();
     println!("It did not crash!");
     loop {}
 }

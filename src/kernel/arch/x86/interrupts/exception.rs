@@ -1,6 +1,37 @@
 use core::arch::asm;
 use core::ptr::addr_of_mut;
 use crate::{enum_str, println};
+use crate::kernel::arch::x86::interrupts::page_fault::PageFaultErrorCode;
+
+#[macro_export]
+macro_rules! save_scratch_registers {
+    ()  => { "
+        push rax
+        push rcx
+        push rdx
+        push rsi
+        push rdi
+        push r8
+        push r9
+        push r10
+        push r11
+    " }
+}
+
+#[macro_export]
+macro_rules! restore_scratch_registers {
+    ()  => { "
+        pop r11
+        pop r10
+        pop r9
+        pop r8
+        pop rsi
+        pop rdi
+        pop rdx
+        pop rcx
+        pop rax
+    " }
+}
 
 #[macro_export]
 macro_rules! interrupt_error {
@@ -9,9 +40,17 @@ macro_rules! interrupt_error {
         extern "C" fn wrapper() -> ! {
            unsafe {
                 asm! {
-                    "mov rdi, rsp", //rdi is used as the first argument passed to a function (x86-64 calling conv) so we move the contents of rsp to rdi
-                    "sub rsp, 8", //align stack pointer
+                    //save scratch (caller-saved) registers
+                    save_scratch_registers!(),
+
+                    "mov rdi, rsp", //rdi is used as the first argument passed to a function so we move the contents of rsp to rdi
+                    "add rdi, 9*8", //adjust the stack frame pointer
                     "call {}", //call the function specified by $name
+
+                     //restore scratch (caller-saved) registers
+                    restore_scratch_registers!(),
+
+                    "iretq", //return program control to the program/procedure that was interrupted
                     sym $name,
                     options(noreturn)
                 }
@@ -28,10 +67,19 @@ macro_rules! interrupt_error_with_code {
         extern "C" fn wrapper() -> ! {
             unsafe {
                 asm! {
-                    "pop rsi", //rsi is used as the second argument passed to a function (x86-64 calling conv) so we pop the error code into rsi.
-                    "mov rdi, rsp", //rdi is used as the first argument passed to a function (x86-64 calling conv) so we move the contents of rsp to rdi
+                    save_scratch_registers!(),
+
+                    "mov rsi, [rsp + 9*8]", //rsi is used as the second argument passed to a function, so we move the error code into rsi.
+                    "mov rdi, rsp", //rdi is used as the first argument passed to a function, so we move the contents of rsp to rdi
+                    "add rdi, 10*8", //adjust the stack frame pointer
                     "sub rsp, 8", //align stack pointer
                     "call {}",  //call the function specified by $name
+                    "add rsp, 8", //restore stack pointer alignment
+
+                    restore_scratch_registers!(),
+
+                    "add rsp,8", //pop error code
+                    "iretq", //return program control to the program/procedure that was interrupted
                     sym $name,
                     options(noreturn)
                 }
@@ -51,46 +99,24 @@ pub struct ExceptionStackFrame {
     stack_segment: u64
 }
 
-pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) -> ! {
+pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) {
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", &*stack_frame );
-    loop {}
 }
 
-enum_str! {
-    enum PageFaultErrorCode {
-        ProtectionViolation = 1 << 0,
-        CausedByWrite = 1 << 1,
-        UserMode = 1 << 2,
-        MalformedTable = 1 << 3,
-        InstructionFetch = 1 << 4,
-        Unknown = 1 << 5,
-    }
+pub extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+    let stack_frame = unsafe { &*stack_frame };
+    println!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}", stack_frame.instruction_pointer, stack_frame);
 }
 
-impl From<u64> for PageFaultErrorCode {
-    fn from(code: u64) -> Self {
-        match code {
-            0x1 =>  PageFaultErrorCode::ProtectionViolation,
-            0x2 =>  PageFaultErrorCode::CausedByWrite,
-            0x3 =>  PageFaultErrorCode::UserMode,
-            0x4 =>  PageFaultErrorCode::MalformedTable,
-            0x5 =>  PageFaultErrorCode::InstructionFetch,
-            _ => PageFaultErrorCode::Unknown
-        }
-    }
-}
-
-pub unsafe extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, error_code: u64) -> ! {
+pub unsafe extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, error_code: u64) {
     let cr2: usize;
     asm! {
         "mov {}, cr2",
         out(reg) cr2
     };
 
-    let cause: PageFaultErrorCode = error_code.into();
     println!("\nEXCEPTION: PAGE FAULT while accessing {:#x} with error code {:?}\n{:#?}",
              cr2,
              Into::<PageFaultErrorCode>::into(error_code).name(),
              &*stack_frame);
-    loop {}
 }
