@@ -126,15 +126,6 @@ impl InterruptDescriptorTable {
         InterruptDescriptorTable([Entry::new(); 16])
     }
 
-    pub fn init(&mut self, index: usize, handler: HandlerFunction) {
-        let mut entry = Entry::new();
-        entry.set_handler(CS::get_reg(), handler);
-        entry.set_attributes(Attributes::new());
-        entry.set_interrupt_stack_table(0);
-
-        self.0[index] = entry;
-    }
-
     pub fn disable_interrupts(&mut self, entry: usize) {
         self.0[entry].attributes = (self.0[entry].attributes & 0xF0) | (GateType::Trap as u8);
     }
@@ -157,7 +148,7 @@ impl InterruptDescriptorTable {
 lazy_static! {
     pub static ref IDT: idt::InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
-        idt.init(0,  interrupt_error!(divide_by_zero_handler));
+        idt.set_handler(0, interrupt_error!(divide_by_zero_handler));
         idt.set_handler(3, interrupt_error!(breakpoint_handler));
         idt.set_handler(14, interrupt_error_with_code!(page_fault_handler));
         idt
