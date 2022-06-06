@@ -103,8 +103,8 @@ pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFram
     println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", &*stack_frame );
 }
 
-pub extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
-    let stack_frame = unsafe { &*stack_frame };
+pub unsafe extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
+    let stack_frame = &*stack_frame;
     println!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}", stack_frame.instruction_pointer, stack_frame);
 }
 
