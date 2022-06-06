@@ -109,14 +109,16 @@ pub unsafe extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
 }
 
 pub unsafe extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, error_code: u64) {
-    let cr2: usize;
+    //when a page fault occurs, the address (Page Fault Linear Address aka PFLA)
+    //that the program attempted to access is stored in the cr2 register
+    let page_fault_linear_address: usize;
     asm! {
-        "mov {}, cr2",
-        out(reg) cr2
+        "mov {}, cr2", //move the value stored in cr2 register to our page_fault_linear_address variable so that we can print it
+        out(reg) page_fault_linear_address
     };
 
     println!("\nEXCEPTION: PAGE FAULT while accessing {:#x} with error code {:?}\n{:#?}",
-             cr2,
+             page_fault_linear_address,
              Into::<PageFaultErrorCode>::into(error_code).name(),
              &*stack_frame);
 }
