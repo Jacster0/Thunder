@@ -32,13 +32,13 @@ pub enum GateType {
 
 #[derive(Debug, Clone, Copy)]
 #[repr(C, packed(2))]
-pub struct InterruptDescriptorTableRegister {
+pub struct InterruptPointer {
     pub limit: u16,
     pub baseAddr: u64,
 }
 
 #[inline]
-pub fn load_idt(idt_register: &InterruptDescriptorTableRegister) {
+pub fn load_idt(idt_register: &InterruptPointer) {
     unsafe {
         asm! {
             "lidt [{}]",
@@ -114,7 +114,7 @@ impl InterruptDescriptorTable {
     pub fn load(&'static self) {
         use core::mem::size_of;
 
-        let idt_register = InterruptDescriptorTableRegister {
+        let idt_register = InterruptPointer {
             limit: (size_of::<Self>() -1) as u16,
             baseAddr: self as *const _ as u64
         };
