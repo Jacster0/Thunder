@@ -12,6 +12,8 @@ use crate::interrupt_error;
 use crate::interrupt_error_with_code;
 use crate::save_scratch_registers;
 use crate::restore_scratch_registers;
+use crate::save_preserved_registers;
+use crate::restore_preserved_registers;
 
 pub type HandlerFunction = extern "C" fn() -> !;
 pub struct InterruptDescriptorTable([Entry; 16]);

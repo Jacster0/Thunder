@@ -22,3 +22,16 @@ impl From<u64> for PageFaultErrorCode {
         }
     }
 }
+
+impl From<usize> for PageFaultErrorCode {
+    fn from(code: usize) -> Self {
+        match code {
+            0x1 =>  PageFaultErrorCode::ProtectionViolation,
+            0x2 =>  PageFaultErrorCode::CausedByWrite,
+            0x3 =>  PageFaultErrorCode::UserMode,
+            0x4 =>  PageFaultErrorCode::MalformedTable,
+            0x5 =>  PageFaultErrorCode::InstructionFetch,
+            _ =>    PageFaultErrorCode::Unknown
+        }
+    }
+}

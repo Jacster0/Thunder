@@ -2,6 +2,7 @@ use core::arch::asm;
 use core::ptr::addr_of_mut;
 use crate::{enum_str, println};
 use crate::kernel::arch::x86::interrupts::page_fault::PageFaultErrorCode;
+use crate::kernel::arch::x86::registers::StackFrame;
 
 #[macro_export]
 macro_rules! save_scratch_registers {
@@ -34,21 +35,45 @@ macro_rules! restore_scratch_registers {
 }
 
 #[macro_export]
+macro_rules! save_preserved_registers {
+    ()  => { "
+        push rbx
+        push rbp
+        push r12
+        push r13
+        push r14
+        push r15
+    " }
+}
+
+#[macro_export]
+macro_rules! restore_preserved_registers {
+    ()  => { "
+        pop r15
+        pop r14
+        pop r13
+        pop r12
+        pop rbp
+        pop rbx
+    " }
+}
+
+
+#[macro_export]
 macro_rules! interrupt_error {
     ($name: ident) => {{
         #[naked]
         extern "C" fn wrapper() -> ! {
            unsafe {
                 asm! {
-                    //save scratch (caller-saved) registers
-                    save_scratch_registers!(),
+                    save_scratch_registers!(), //save scratch (caller-saved/volatile) registers
+                    save_preserved_registers!(), //save preserved (callee-saved/non volatile) registers
 
-                    "mov rdi, rsp", //rdi is used as the first argument passed to a function so we move the contents of rsp to rdi
-                    "add rdi, 9*8", //adjust the stack frame pointer
-                    "call {}", //call the function specified by $name
+                    "mov rdi, rsp", //rdi is used as the first argument passed to a function so we move rsp to rdi
+                    "call {}", //call the function specified by $name with pointer to stack (rdi)
 
-                     //restore scratch (caller-saved) registers
-                    restore_scratch_registers!(),
+                    restore_preserved_registers!(), //restore preserved (callee-saved/non volatile) registers
+                    restore_scratch_registers!(), //restore scratch (caller-saved/volatile) registers
 
                     "iretq", //return program control to the program/procedure that was interrupted
                     sym $name,
@@ -67,18 +92,19 @@ macro_rules! interrupt_error_with_code {
         extern "C" fn wrapper() -> ! {
             unsafe {
                 asm! {
-                    save_scratch_registers!(),
+                    //"xchg [rsp], rax",
+                    save_scratch_registers!(), //save scratch (caller-saved/volatile) registers
+                    save_preserved_registers!(), //save preserved (callee-saved/non volatile) registers
 
-                    "mov rsi, [rsp + 9*8]", //rsi is used as the second argument passed to a function, so we move the error code into rsi.
-                    "mov rdi, rsp", //rdi is used as the first argument passed to a function, so we move the contents of rsp to rdi
-                    "add rdi, 10*8", //adjust the stack frame pointer
-                    "sub rsp, 8", //align stack pointer
-                    "call {}",  //call the function specified by $name
-                    "add rsp, 8", //restore stack pointer alignment
-
-                    restore_scratch_registers!(),
-
+                    "mov rsi, [rsp + 15*8]", //rsi is used as the second argument passed to a function, so we move the error code into rsi.
+                    "add rsp, 8", //align stack pointer
+                    "mov rdi, rsp", //rdi is used as the first argument passed to a function so we move rsp to rdi
+                    "call {}",  //call the function specified by $name with pointer to stack (rdi) and error code (rsi)
                     "add rsp,8", //pop error code
+
+                    restore_preserved_registers!(), //restore preserved (callee-saved/non volatile) registers
+                    restore_scratch_registers!(), //restore scratch (caller-saved/volatile) registers
+
                     "iretq", //return program control to the program/procedure that was interrupted
                     sym $name,
                     options(noreturn)
@@ -99,16 +125,30 @@ pub struct ExceptionStackFrame {
     stack_segment: u64
 }
 
-pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &ExceptionStackFrame) {
-    println!("\nEXCEPTION: DIVIDE BY ZERO\n{:#?}", &*stack_frame );
+#[derive(Default)]
+#[repr(packed)]
+pub struct PreservedRegisters {
+    pub r15: usize,
+    pub r14: usize,
+    pub r13: usize,
+    pub r12: usize,
+    pub rbp: usize,
+    pub rbx: usize,
 }
 
-pub unsafe extern "C" fn breakpoint_handler(stack_frame: &ExceptionStackFrame) {
-    let stack_frame = &*stack_frame;
-    println!("\nEXCEPTION: BREAKPOINT at {:#x}\n{:#?}", stack_frame.instruction_pointer, stack_frame);
+pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &StackFrame) {
+    println!("\nEXCEPTION: DIVIDE BY ZERO\n");
+    println!("\nRegister dump:");
+    stack_frame.dump();
 }
 
-pub unsafe extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, error_code: u64) {
+pub unsafe extern "C" fn breakpoint_handler(stack_frame: &StackFrame) {
+    let rip = stack_frame.iret.rip;
+    println!("\nEXCEPTION: BREAKPOINT at {:#x}", rip);
+    stack_frame.dump();
+}
+
+pub unsafe extern "C" fn page_fault_handler(stack_frame: &StackFrame, error_code: usize) {
     //when a page fault occurs, the address (Page Fault Linear Address aka PFLA)
     //that the program attempted to access is stored in the cr2 register
     let page_fault_linear_address: usize;
@@ -117,8 +157,9 @@ pub unsafe extern "C" fn page_fault_handler(stack_frame: &ExceptionStackFrame, e
         out(reg) page_fault_linear_address
     };
 
-    println!("\nEXCEPTION: PAGE FAULT while accessing {:#x} with error code {:?}\n{:#?}",
+    println!("\nEXCEPTION: PAGE FAULT while accessing {:#x} with error code {:?}",
              page_fault_linear_address,
-             Into::<PageFaultErrorCode>::into(error_code).name(),
-             &*stack_frame);
+             Into::<PageFaultErrorCode>::into(error_code).name());
+
+    stack_frame.dump();
 }
