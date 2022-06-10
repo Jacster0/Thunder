@@ -92,7 +92,6 @@ macro_rules! interrupt_error_with_code {
         extern "C" fn wrapper() -> ! {
             unsafe {
                 asm! {
-                    //"xchg [rsp], rax",
                     save_scratch_registers!(), //save scratch (caller-saved/volatile) registers
                     save_preserved_registers!(), //save preserved (callee-saved/non volatile) registers
 
