@@ -6,5 +6,4 @@ use crate::println;
 
 pub mod idt;
 pub mod exception;
-pub mod handlers;
 mod page_fault;

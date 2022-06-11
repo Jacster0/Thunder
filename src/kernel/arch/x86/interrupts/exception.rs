@@ -10,8 +10,8 @@ macro_rules! save_scratch_registers {
         push rax
         push rcx
         push rdx
-        push rsi
         push rdi
+        push rsi
         push r8
         push r9
         push r10
@@ -96,13 +96,13 @@ macro_rules! interrupt_error_with_code {
                     save_preserved_registers!(), //save preserved (callee-saved/non volatile) registers
 
                     "mov rsi, [rsp + 15*8]", //rsi is used as the second argument passed to a function, so we move the error code into rsi.
-                    "add rsp, 8", //align stack pointer
                     "mov rdi, rsp", //rdi is used as the first argument passed to a function so we move rsp to rdi
                     "call {}",  //call the function specified by $name with pointer to stack (rdi) and error code (rsi)
-                    "add rsp,8", //pop error code
 
                     restore_preserved_registers!(), //restore preserved (callee-saved/non volatile) registers
                     restore_scratch_registers!(), //restore scratch (caller-saved/volatile) registers
+
+                    "add rsp,8", //pop error code
 
                     "iretq", //return program control to the program/procedure that was interrupted
                     sym $name,
@@ -112,27 +112,6 @@ macro_rules! interrupt_error_with_code {
         }
         wrapper
     }}
-}
-
-#[derive(Debug)]
-#[repr(C)]
-pub struct ExceptionStackFrame {
-    instruction_pointer: u64,
-    code_segment: u64,
-    cpu_flags: u64,
-    stack_pointer: u64,
-    stack_segment: u64
-}
-
-#[derive(Default)]
-#[repr(packed)]
-pub struct PreservedRegisters {
-    pub r15: usize,
-    pub r14: usize,
-    pub r13: usize,
-    pub r12: usize,
-    pub rbp: usize,
-    pub rbx: usize,
 }
 
 pub unsafe extern "C" fn divide_by_zero_handler(stack_frame: &StackFrame) {

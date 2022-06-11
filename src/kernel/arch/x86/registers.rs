@@ -59,6 +59,7 @@ pub struct IretRegisters {
     pub rsp: usize,
     pub ss: usize
 }
+
 impl IretRegisters {
     pub fn dump(&self) {
         println!("RFLAG = 0x{:016x} ", { self.rflags });
