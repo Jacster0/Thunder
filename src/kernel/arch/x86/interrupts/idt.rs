@@ -6,17 +6,20 @@ use modular_bitfield::prelude::*;
 use x86_64::instructions::segmentation::CS;
 use x86_64::registers::segmentation::Segment;
 use crate::kernel::arch::x86::interrupts::{exception, idt};
-use crate::println;
 use crate::kernel::arch::x86::interrupts::exception::*;
-use crate::interrupt_error;
-use crate::interrupt_error_with_code;
-use crate::save_scratch_registers;
-use crate::restore_scratch_registers;
-use crate::save_preserved_registers;
-use crate::restore_preserved_registers;
+
+use crate:: {
+    println,
+    interrupt_error,
+    interrupt_error_with_code,
+    save_scratch_registers,
+    restore_scratch_registers,
+    save_preserved_registers,
+    restore_preserved_registers,
+};
 
 pub type HandlerFunction = extern "C" fn() -> !;
-pub struct InterruptDescriptorTable([Entry; 16]);
+pub struct InterruptDescriptorTable([Entry; 31]);
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[repr(u8)]
@@ -36,7 +39,7 @@ pub enum GateType {
 #[repr(C, packed(2))]
 pub struct InterruptPointer {
     pub limit: u16,
-    pub baseAddr: u64,
+    pub base_addr: u64,
 }
 
 #[inline]
@@ -118,14 +121,14 @@ impl InterruptDescriptorTable {
 
         let idt_register = InterruptPointer {
             limit: (size_of::<Self>() -1) as u16,
-            baseAddr: self as *const _ as u64
+            base_addr: self as *const _ as u64
         };
 
         load_idt(&idt_register)
     }
 
     pub fn new() -> InterruptDescriptorTable {
-        InterruptDescriptorTable([Entry::new(); 16])
+        InterruptDescriptorTable([Entry::new(); 31])
     }
 
     pub fn disable_interrupts(&mut self, entry: usize) {
@@ -136,7 +139,7 @@ impl InterruptDescriptorTable {
         self.0[entry].attributes = (self.0[entry].attributes & 0xF0) | (GateType::Interrupt as u8);
     }
 
-    pub fn set_handler(&mut self, entry: usize, handler: HandlerFunction) {
+    pub fn register_handler(&mut self, entry: usize, handler: HandlerFunction) {
         self.0[entry].set_handler(CS::get_reg(), handler);
         self.0[entry].set_attributes(Attributes::new());
         self.0[entry].set_interrupt_stack_table(0);
@@ -150,9 +153,31 @@ impl InterruptDescriptorTable {
 lazy_static! {
     pub static ref IDT: idt::InterruptDescriptorTable = {
         let mut idt = InterruptDescriptorTable::new();
-        idt.set_handler(0, interrupt_error!(divide_by_zero_handler));
-        idt.set_handler(3, interrupt_error!(breakpoint_handler));
-        idt.set_handler(14, interrupt_error_with_code!(page_fault_handler));
+
+        idt.register_handler(0, interrupt_error!(divide_by_zero));
+        idt.register_handler(1, interrupt_error!(debug));
+        idt.register_handler(2, interrupt_error!(non_maskable_interrupt));
+        idt.register_handler(3, interrupt_error!(breakpoint));
+        idt.register_handler(4, interrupt_error!(overflow));
+        idt.register_handler(5, interrupt_error!(bound_range_exceeded));
+        idt.register_handler(6, interrupt_error!(invalid_opcode));
+        idt.register_handler(7, interrupt_error!(device_not_available));
+        idt.register_handler(8, interrupt_error_with_code!(double_fault));
+        // 9 Coprocessor Segment Overrun, not available anymore
+        idt.register_handler(10, interrupt_error_with_code!(invalid_tss));
+        idt.register_handler(11, interrupt_error_with_code!(segment_not_present));
+        idt.register_handler(12, interrupt_error_with_code!(stack_segment_fault));
+        idt.register_handler(13, interrupt_error_with_code!(general_protection_fault));
+        idt.register_handler(14, interrupt_error_with_code!(page_fault));
+        // 15 reserved
+        idt.register_handler(16, interrupt_error!(x87_floating_point_exception));
+        idt.register_handler(17, interrupt_error_with_code!(alignment_check));
+        //idt.register_handler(18, interrupt_error!());
+        idt.register_handler(19, interrupt_error!(simd_floating_point_exception));
+        idt.register_handler(20, interrupt_error!(virtualization_exception));
+        // [21..29] reserved
+        idt.register_handler(30, interrupt_error_with_code!(security_exception));
+
         idt
     };
 }

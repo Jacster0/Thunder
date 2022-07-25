@@ -59,7 +59,7 @@ pub struct PageFaultBuilder;
 
 impl PageFaultBuilder {
     pub fn build(code: usize) -> PageFault {
-        let page_fault_error =  match code & PageFaultBitMasks::ERROR_CODE {
+        let page_fault_error = match code & PageFaultBitMasks::ERROR_CODE {
             0x0 =>  PageFaultErrorCode::NonPresentRead,
             0x1 =>  PageFaultErrorCode::ProtectionViolationRead,
             0x2 =>  PageFaultErrorCode::NonPresentWrite,
